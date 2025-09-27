@@ -33,6 +33,8 @@ class User(AbstractBaseUser):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
+    company = models.OneToOneField("companies.Company", null=True, blank=True, on_delete=models.SET_NULL, related_name="users")
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
@@ -47,3 +49,4 @@ class User(AbstractBaseUser):
     
     def has_module_perms(self, app_label):
         return True
+    

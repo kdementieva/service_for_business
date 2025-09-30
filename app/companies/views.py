@@ -1,22 +1,32 @@
 from django.shortcuts import render
 from rest_framework import generics, permissions
-from rest_framework.exceptions import PermissionDenied
-from .models import Company
-from .serializers import CompanySerializer
+from .models import Company, Storage
+from .serializers import CompanySerializer, StorageSerializer
+from .permissions import IsOwnerOrReadOnly
 
 class CompanyCreateView(generics.CreateAPIView):
-    queryset = Company.objects.all()
     serializer_class = CompanySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        user = self.request.user
+        serializer.save(owner=self.request.user)
 
-        if hasattr(user, "owned_company"):
-            raise PermissionDenied("У этого пользователя уже есть компания")
-        
-        company = serializer.save(owner=user)
-        user.is_company_owner = True
-        user.company = company
-        user.save()
+class CompanyDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+
+class StorageCreateView(generics.CreateAPIView):
+    serializer_class = StorageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.owned_company)
+
+class StorageDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Storage.objects.all()
+    serializer_class = StorageSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+
+
 

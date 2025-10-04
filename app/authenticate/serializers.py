@@ -9,7 +9,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "password", "is_company_owner")
+        fields = ("email", "password")
 
     def validate_password(self, value):
         validate_password(value)
@@ -19,5 +19,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         user = User.objects.create_user(**validated_data)
         user.set_password(password)
+        user.is_company_owner = False
         user.save()
         return user

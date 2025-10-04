@@ -15,3 +15,13 @@ class Storage(models.Model):
     address = models.CharField(max_length=500)
     def __str__(self):
         return f"{self.name} ({self.company.name})"
+    
+class Supplier(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="suppliers")
+    name = models.CharField(max_length=255)
+    inn = models.CharField(max_length=12, unique=True)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    address = models.CharField(max_length=500, blank=True, null=True)
+    def __str__(self):
+        return f"{self.name} ({self.inn} - {self.company.name})"

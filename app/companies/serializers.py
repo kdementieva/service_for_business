@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Company, Storage
+from .models import Company, Storage, Supplier
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -23,3 +23,19 @@ class StorageSerializer(serializers.ModelSerializer):
         model = Storage
         fields = ['id', 'name', 'address', 'company']
         read_only_fields = ['company']
+
+class SupplierSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Supplier
+        fields = ['id', 'name', 'inn', 'phone', 'email', 'company']
+        read_only_fields = ['company']
+
+    def validate_inn(self, value):
+        if not value.isdigit() or len(value) not in (10, 12):
+            raise serializers.ValidationError("ИНН должен содержать 10 или 12 цифр")
+        return value  
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['company'] = user.owned_company
+        return super().create(validated_data)

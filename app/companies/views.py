@@ -1,8 +1,8 @@
 from django.shortcuts import render
 from rest_framework import generics, permissions
-from .models import Company, Storage
-from .serializers import CompanySerializer, StorageSerializer
-from .permissions import IsOwnerOrReadOnly
+from .models import Company, Storage, Supplier
+from .serializers import CompanySerializer, StorageSerializer, SupplierSerializer
+from .permissions import IsOwnerOrReadOnly, IsCompanyMember
 
 class CompanyCreateView(generics.CreateAPIView):
     serializer_class = CompanySerializer
@@ -27,6 +27,19 @@ class StorageDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Storage.objects.all()
     serializer_class = StorageSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+
+class SupplierListCreateView(generics.ListCreateAPIView):
+    serializer_class = SupplierSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+    def get_queryset(self):
+        return Supplier.objects.filter(company=self.request.user.owned_company)
+
+class SupplierDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = SupplierSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+
+    def get_queryset(self):
+        return Supplier.objects.filter(company=self.request.user.owned_company)    
 
 
 

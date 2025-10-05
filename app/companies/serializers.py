@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Company, Storage, Supplier
+from .models import Company, Storage, Supplier, Supply, SupplyProduct, Product
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,3 +39,50 @@ class SupplierSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         validated_data['company'] = user.owned_company
         return super().create(validated_data)
+
+class SupplyProductSerializer(serializers.ModelSerializer):
+    product_title = serializers.CharField(source="product.title", read_only=True)
+    class Meta:
+        model = SupplyProduct
+        fields = ['product', 'product_title', 'quantity']
+
+class SupplySerializer(serializers.ModelSerializer):
+    supply_items = SupplyProductSerializer(many=True, write_only=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    delivery_date = serializers.DateField()
+    class Meta:
+        model = Supply
+        fields = ['id', 'supplier_id', 'supplier_name', 'delivery_date', 'supply_items']
+    
+    def create(self, validated_data):
+        supply_items_data = validated_data.pop('supply_items')
+        supply = Supply.objects.create(**validated_data)
+
+        for item_data in supply_items_data:
+            product = item_data['product']
+            quantity = item_data['quantity']
+
+            if quantity <= 0:
+                raise serializers.ValidationError("Количество должно быть положительным числом")
+            
+            SupplyProduct.objects.create(supply=supply, product=product, quantity=quantity)
+            product.quantity += quantity
+            product.save()
+        return supply
+
+class ProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'description', 'purchase_price', 'sale_price', 'quantity', 'storage_id']
+        read_only_fields = ['quantity']
+
+    def create(self, validated_data):
+        validated_data['quantity'] = 0
+        return super().create(validated_data)
+
+class SupplyListSerializer(serializers.ModelSerializer):
+    products = SupplyProductSerializer(source='supply_items', many=True, read_only=True)
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    class Meta:
+        model = Supply
+        fields = ['id', 'supplier_name', 'delivery_date', 'products']

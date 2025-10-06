@@ -12,9 +12,13 @@ class IsCompanyMember(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        if hasattr(user, "owned_company") and obj.supplier.company == user.owned_company:
-            return True
-        if hasattr(user, "company") and user.company == obj.company:
-            return True
-        return False
+        company = None
+        if hasattr(obj, "company"):
+            company = obj.company
+        elif hasattr(obj, "storage"):
+            company = obj.storage.company
+        elif hasattr(obj, "supplier"):
+            company = obj.supplier.company
+        return hasattr(user, "owned_company") and user.owned_company == company or getattr(user, "company", None) == company
+
     

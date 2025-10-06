@@ -1,7 +1,9 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions
+from django.contrib.auth import get_user_model
+from rest_framework.response import Response
+from rest_framework import generics, permissions, status
 from .models import Company, Storage, Supplier, Supply, Product
-from .serializers import CompanySerializer, StorageSerializer, SupplierSerializer, SupplySerializer, SupplyListSerializer, ProductSerializer
+from .serializers import CompanySerializer, StorageSerializer, SupplierSerializer, SupplySerializer, SupplyListSerializer, ProductSerializer, AddUserToCompanySerializer
 from .permissions import IsOwnerOrReadOnly, IsCompanyMember
 
 class CompanyCreateView(generics.CreateAPIView):
@@ -50,7 +52,7 @@ class SupplyListCreateView(generics.ListCreateAPIView):
         if hasattr(user, "owned_company"):
             return Supply.objects.filter(supplier__company=user.owned_company)
         elif hasattr(user, "company"):
-            return Supply.object.filter(supplier__company=user.company)
+            return Supply.objects.filter(supplier__company=user.company)
         return Supply.objects.none()
     
     def get_serializer_class(self):
@@ -94,4 +96,19 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
             return Product.objects.filter(storage__company=user.company)
         return Product.objects.none()
 
+User = get_user_model()
+class AddUserToCompanyView(generics.UpdateAPIView):
+    serializer_class = AddUserToCompanySerializer
+    permission_classes = [permissions.IsAuthenticated]
 
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        if not hasattr(user, "owner_company"):
+            return Response({"detail": "Только владелец компании может добавлять пользователей"}, status=status.HTTP_403_FORBIDDEN)
+        email = request.data.get("email")
+        target_user = User.objects.filter(email=email).first()
+        if not target_user:
+            return Response({"detail": "Пользователь не найден"}, status=status.HTTP_404_NOT_FOUND)
+        target_user.company = user.owned_company
+        target_user.save()
+        return Response({"detail": f"Пользователь {email} прикреплён к компании {user.owned_company.name}"}, status=status.HTTP_200_OK)

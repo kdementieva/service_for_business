@@ -86,3 +86,6 @@ class SupplyListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supply
         fields = ['id', 'supplier_name', 'delivery_date', 'products']
+
+class AddUserToCompanySerializer(serializers.Serializer):
+    email = serializers.EmailField()

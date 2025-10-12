@@ -50,4 +50,18 @@ class SupplyProduct(models.Model):
     def __str__(self):
         return f"{self.product.name} — {self.quantity} шт. (Поставка {self.supply.id})"
     
+class Sale(models.Model):
+    buyer_name = models.CharField(max_length=255)
+    sale_date = models.DateField()
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="company_sales", null=False, blank=False)
+    products_sales = models.ManyToManyField(Product, through="ProductSale", related_name="sales")
+    def __str__(self):
+        return f"Продажа #{self.id} от {self.sale_date} ({self.company.name})"
+    
+class ProductSale(models.Model):
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="product_links")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="product_sales")
+    quantity = models.PositiveIntegerField()
+    def __str__(self):
+        return f"{self.product.name} - {self.quantity} шт. (Продажа {self.sale.id})"
 

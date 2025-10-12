@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Company, Storage, Supplier, Supply, SupplyProduct, Product
+from .models import Company, Storage, Supplier, Supply, SupplyProduct, Product, Sale, ProductSale
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -41,13 +41,14 @@ class SupplierSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class SupplyProductSerializer(serializers.ModelSerializer):
-    product_title = serializers.CharField(source="product.title", read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
     class Meta:
         model = SupplyProduct
-        fields = ['product', 'product_title', 'quantity']
+        fields = ['product', 'product_name', 'quantity']
 
 class SupplySerializer(serializers.ModelSerializer):
     supply_items = SupplyProductSerializer(many=True, write_only=True)
+    supplier_id = serializers.PrimaryKeyRelatedField(source='supplier', queryset=Supplier.objects.all(), write_only=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     delivery_date = serializers.DateField()
     class Meta:
@@ -71,6 +72,7 @@ class SupplySerializer(serializers.ModelSerializer):
         return supply
 
 class ProductSerializer(serializers.ModelSerializer):
+    storage_id = serializers.PrimaryKeyRelatedField(source='storage', queryset=Storage.objects.all(), write_only=True)
     class Meta:
         model = Product
         fields = ['id', 'name', 'description', 'purchase_price', 'sale_price', 'quantity', 'storage_id']
@@ -89,3 +91,44 @@ class SupplyListSerializer(serializers.ModelSerializer):
 
 class AddUserToCompanySerializer(serializers.Serializer):
     email = serializers.EmailField()
+
+class ProductSaleSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+
+    class Meta:
+        model = ProductSale
+        fields = ['product', 'product_name', 'quantity']
+
+
+class SaleSerializer(serializers.ModelSerializer):
+    products_sales = ProductSaleSerializer(source='product_links', many=True)
+
+    class Meta:
+        model = Sale
+        fields = ['id', 'buyer_name', 'sale_date', 'company', 'products_sales']
+        read_only_fields = ['company']
+
+    def create(self, validated_data):
+        products_data = validated_data.pop('product_links')
+        user = self.context['request'].user
+        validated_data['company'] = user.owned_company
+        sale = Sale.objects.create(**validated_data)
+
+        for item in products_data:
+            product = item['product']
+            quantity = item['quantity']
+
+            if quantity <= 0:
+                raise serializers.ValidationError("Количество должно быть положительным числом")
+            if product.quantity < quantity:
+                raise serializers.ValidationError(f"Недостаточно товара: {product.name}")
+
+            ProductSale.objects.create(sale=sale, product=product, quantity=quantity)
+            product.quantity -= quantity
+            product.save()
+
+        return sale
+
+    def update(self, instance, validated_data):
+        validated_data.pop('product_links', None)
+        return super().update(instance, validated_data)

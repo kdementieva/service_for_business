@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from rest_framework import generics, permissions, status
-from .models import Company, Storage, Supplier, Supply, Product
-from .serializers import CompanySerializer, StorageSerializer, SupplierSerializer, SupplySerializer, SupplyListSerializer, ProductSerializer, AddUserToCompanySerializer
+from .models import Company, Storage, Supplier, Supply, Product, Sale
+from .serializers import CompanySerializer, StorageSerializer, SupplierSerializer, SupplySerializer, SupplyListSerializer, ProductSerializer, AddUserToCompanySerializer, SaleSerializer, ProductSaleSerializer
 from .permissions import IsOwnerOrReadOnly, IsCompanyMember
 
 class CompanyCreateView(generics.CreateAPIView):
@@ -112,3 +112,32 @@ class AddUserToCompanyView(generics.UpdateAPIView):
         target_user.company = user.owned_company
         target_user.save()
         return Response({"detail": f"Пользователь {email} прикреплён к компании {user.owned_company.name}"}, status=status.HTTP_200_OK)
+    
+class SaleCreateView(generics.ListCreateAPIView):
+    serializer_class = SaleSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, "owned_company"):
+            return Sale.objects.filter(company=user.owned_company).order_by("-sale_date")
+        return Sale.objects.none()
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        if not hasattr(user, "owned_company") or user.owned_company is None:
+            raise PermissionError("Вы не являетесь владельцем компании и не можете создавать продажи.")
+
+        serializer.save(company=user.owned_company)
+
+class SaleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = SaleSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'owned_company'):
+            return Sale.objects.filter(company=user.owned_company)
+        elif hasattr(user, 'company'):
+            return Sale.objects.filter(company=user.company)
+        return Sale.objects.none()
